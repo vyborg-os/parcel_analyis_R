@@ -1,0 +1,357 @@
+---
+title: "R Notebook"
+output:
+  html_notebook: default
+  word_document: default
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code.
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Cmd+Shift+Enter*.
+
+```{r}
+library(ggplot2)
+library(dplyr)
+library(readxl)
+```
+
+```{r}
+
+# Load the dataset
+
+parcel_data <- read_excel("parcel_97.xlsx")
+driver_data <- read_excel("driver_97.xlsx")
+
+```
+
+```{r}
+# View structure of parcel data
+str(parcel_data)
+
+# View structure of driver data
+str(driver_data)
+```
+
+```{r}
+# clean the dataset
+
+# finding missing values in the driver data
+sapply(driver_data, function(x) sum(is.na(x)))
+
+#No missing value detected
+```
+
+```{r}
+# checking for missing value in the parcel data
+sapply(parcel_data, function(x) sum(is.na(x)))
+
+# missing value exist in two column, priority_delivery and parcel_payment
+```
+
+```{r}
+# Uniquely finding the data in priority_delivery column to identify the missing values
+unique(parcel_data$priority_delivery)
+```
+
+```{r}
+
+# Same process as above on the parcel_payment
+unique(parcel_data$parcel_payment)
+```
+
+
+```{r}
+# replacing the NA values in parce_payment column to no_payment
+ parcel_data["parcel_payment"][is.na(parcel_data["parcel_payment"])] <- 'no_payment'
+
+# replacing the NA values in parce_payment column to no_payment
+ parcel_data["priority_delivery"][is.na(parcel_data["priority_delivery"])] <- 'no'
+```
+
+```{r}
+# Summary statistics for parcel data
+summary(parcel_data)
+
+# Summary statistics for driver data
+summary(driver_data)
+
+# Cross-tabulation of parcel status and priority delivery
+table(parcel_data$parcel_status, parcel_data$priority_delivery)
+
+# Average parcel value by promotion purchase
+aggregate(parcel_value ~ promotions_purchase, data = parcel_data, FUN = mean)
+
+# Average years of experience by van type
+aggregate(experience ~ van_type, data = driver_data, FUN = mean)
+
+# Merge parcel and driver data by driver_id
+merged_data <- merge(parcel_data, driver_data, by = "driver_id")
+
+# Create a scatter plot of parcel value vs. years of experience
+plot(merged_data$experience, merged_data$parcel_value)
+
+```
+
+```{r}
+# Check the structure of the data
+str(parcel_data)
+
+# Check summary statistics of parcel value
+summary(parcel_data$parcel_value)
+
+# Visualize the distribution of parcel value
+ggplot(parcel_data, aes(x = parcel_value)) +
+  geom_histogram(bins = 30)
+
+# Calculate the proportion of parcels delivered on time
+num_delivered_on_time <- parcel_data %>%
+  filter(parcel_status == "delivered" & time_of_delivery <= parcel_arrived) %>%
+  nrow()
+num_total_deliveries <- nrow(parcel_data)
+prop_delivered_on_time <- num_delivered_on_time / num_total_deliveries
+prop_delivered_on_time
+
+parcel_data$parcel_arrived <- as.POSIXct(parcel_data$parcel_arrived, origin = "1970-01-01", format = "%Y-%m-%d %H:%M:%S")
+
+parcel_data$time_of_delivery <- as.POSIXct(parcel_data$time_of_delivery, format = "%Y-%m-%d %H:%M:%S")
+
+# merge data
+merged_data <- parcel_data %>% left_join(driver_data, by = "driver_id")
+
+# calculate average delivery time by driver gender
+avg_delivery_time <- merged_data %>% 
+  group_by(gender) %>% 
+  summarize(avg_delivery_time = mean(as.numeric(time_of_delivery - parcel_arrived), na.rm = TRUE))
+
+# display results
+avg_delivery_time
+
+```
+
+
+
+```{r}
+parcel_data <- parcel_data %>%
+  mutate(parcel_arrived = as.POSIXct(parcel_data$parcel_arrived, origin = "1970-01-01", format = "%Y-%m-%d %H:%M:%S"),
+         time_of_delivery = as.POSIXct(time_of_delivery, format = "%Y-%m-%d %H:%M:%S"),
+         delivery_delay = time_of_delivery - parcel_arrived,
+         )
+
+driver_data$work_pattern <- factor(driver_data$work_pattern, levels = c("zero-hour contract", "part-time", "full-time"))
+
+# Create summary tables
+summary_table_1 <- parcel_data %>%
+  group_by(parcel_status) %>%
+  summarize(count = n())
+
+summary_table_2 <- parcel_data %>%
+  group_by(promotions_purchase) %>%
+  summarize(avg_parcel_value = mean(parcel_value))
+
+summary_table_3 <- parcel_data %>%
+  group_by(priority_delivery) %>%
+  summarize(avg_delivery_delay = mean(as.numeric(delivery_delay)))
+```
+
+```{r}
+# Proportion of parcels returned
+ggplot(parcel_data, aes(x = parcel_returned)) +
+  geom_bar(aes(y = (..count..)/sum(..count..)), fill = "blue") +
+  scale_y_continuous(labels = scales::percent_format()) +
+  labs(x = "Parcel Returned?", y = "Proportion",
+       title = "Proportion of Parcels Returned")
+
+```
+
+```{r}
+# Create a bar chart of driver gender
+ggplot(driver_data, aes(x = gender)) + 
+  geom_bar(fill = "blue") +
+  ggtitle("Driver Gender Distribution") +
+  xlab("Gender") +
+  ylab("Count")
+
+```
+
+```{r}
+# Boxplot for driver experience
+ggplot(driver_data, aes(x = "", y = experience)) + 
+  geom_boxplot() +
+  ggtitle("Driver Experience Distribution") +
+  xlab("") +
+  ylab("Years of Experience")
+```
+
+```{r}
+# Bar chart for van type
+ggplot(driver_data, aes(x = van_type)) + 
+  geom_bar() +
+  ggtitle("Van Type Distribution") +
+  xlab("Van Type") +
+  ylab("Count")
+
+```
+
+```{r}
+# Bar chart for work pattern
+ggplot(driver_data, aes(x = work_pattern)) + 
+  geom_bar() +
+  ggtitle("Work Pattern Distribution") +
+  xlab("Work Pattern") +
+  ylab("Count")
+```
+
+```{r}
+merged_data <- merge(parcel_data, driver_data, by = "driver_id")
+
+```
+
+```{r}
+# Parcel value by driver gender
+ggplot(merged_data, aes(x = gender, y = parcel_value)) + 
+  geom_boxplot() + 
+  labs(title = "Parcel Value by Driver Gender", x = "Driver Gender", y = "Parcel Value (GBP)")
+```
+
+```{r}
+# Number of parcels delivered by driver experience
+ggplot(merged_data, aes(x = experience, fill = parcel_status)) + 
+  geom_bar(position = "dodge") + 
+  labs(title = "Number of Parcels Delivered by Driver Experience", x = "Driver Experience (years)", y = "Number of Parcels", fill = "Parcel Status")
+
+```
+
+
+```{r}
+# Parcel delivery location by van type
+ggplot(merged_data, aes(x = van_type, fill = delivery_location)) + 
+  geom_bar(position = "dodge") + 
+  labs(title = "Parcel Delivery Location by Van Type", x = "Van Type", y = "Number of Parcels", fill = "Delivery Location")
+
+```
+
+
+```{r}
+# Create dashboard plots
+plot_1 <- ggplot(parcel_data, aes(x = parcel_status)) +
+  geom_bar() +
+  labs(title = "Parcel Status Summary", x = "Parcel Status", y = "Count") +
+  geom_text(stat = "count", aes(label = paste0(round(after_stat(count)/sum(after_stat(count))*100), "%")), vjust = -0.5)
+
+plot_2 <- ggplot(parcel_data, aes(x = promotions_purchase, y = parcel_value)) +
+  geom_boxplot() +
+  labs(title = "Parcel Value by Promotion Purchase", x = "Promotion Purchase", y = "Parcel Value") +
+  stat_summary(fun = mean, geom = "point", shape = 23, size = 3, fill = "white")
+
+plot_3 <- ggplot(parcel_data, aes(y = priority_delivery)) +
+  geom_bar() +
+  labs(title = "Delivery Delay by Priority Delivery", x = "Priority Delivery", y = "Parcel Value")
+  
+
+plot_4 <- ggplot(driver_data, aes(x = work_pattern, fill = van_type)) +
+  geom_bar(position = "dodge") +
+  labs(title = "Driver Work Pattern and Van Type", x = "Work Pattern", y = "Count") +
+  scale_fill_manual(values = c("red", "blue", "green"))
+
+# Create dashboard layout
+dashboard_layout <- gridExtra::grid.arrange(plot_1, plot_2, plot_3, plot_4, ncol = 2, widths = c(3, 3))
+
+```
+```{r}
+# Load necessary libraries
+library(ggplot2)
+library(dplyr)
+library(readxl)
+library(shiny)
+
+parcel_data <- read_excel("parcel_97.xlsx")
+driver_data <- read_excel("driver_97.xlsx")
+# Merge data
+merged_data <- left_join(parcel_data, driver_data, by = "driver_id")
+
+# Define UI for shiny app
+ui <- fluidPage(
+  
+  # Dashboard title
+  titlePanel("Parcel Delivery Dashboard"),
+  
+  # Sidebar with input options
+  sidebarLayout(
+    sidebarPanel(
+      # Variable selection for van type analysis
+      selectInput("van_type", "Select Van Type:",
+                  choices = unique(merged_data$van_type)),
+      
+      # Variable selection for parcel status analysis
+      selectInput("parcel_status", "Select Parcel Status:",
+                  choices = unique(merged_data$parcel_status)),
+      
+      # Variable selection for gender analysis
+      selectInput("gender", "Select Gender:",
+                  choices = unique(driver_data$gender))
+    ),
+    
+    # Main panel with output plots
+    mainPanel(
+      tabsetPanel(
+        tabPanel("Van Type Analysis",
+                 plotOutput("van_type_plot")),
+        tabPanel("Parcel Status Analysis",
+                 plotOutput("parcel_status_plot")),
+        tabPanel("Gender Analysis",
+                 plotOutput("gender_plot"))
+      )
+    )
+  )
+)
+
+# Define server for shiny app
+server <- function(input, output) {
+  
+  # Van type analysis
+  output$van_type_plot <- renderPlot({
+    filtered_data <- merged_data %>%
+      filter(van_type == input$van_type)
+    ggplot(filtered_data, aes(x = parcel_status, fill = priority_delivery)) +
+      geom_bar(position = "dodge") +
+      labs(title = "Parcel Status by Van Type",
+           x = "Parcel Status",
+           y = "Count") +
+      theme_minimal()
+  })
+  
+
+  # Parcel status analysis
+  output$parcel_status_plot <- renderPlot({
+    filtered_data <- merged_data %>%
+      filter(parcel_status == input$parcel_status)
+    ggplot(filtered_data, aes(x = time_of_delivery, fill = priority_delivery)) +
+      geom_density(alpha = 0.5) +
+      labs(title = "Time of Delivery by Parcel Status",
+           x = "Time of Delivery",
+           y = "Density") +
+      theme_minimal()
+  })
+  
+  # Gender analysis
+  output$gender_plot <- renderPlot({
+    filtered_data <- merged_data %>%
+      filter(gender == input$gender)
+    ggplot(filtered_data, aes(x = experience, y = delivery_location, fill = work_pattern)) +
+      geom_tile() +
+      labs(title = "Delivery Locations by Driver Gender",
+           x = "Years of Experience",
+           y = "Delivery Location") +
+      theme_minimal()
+  })
+  
+}
+
+# Run Shiny dashboard
+shinyApp(ui, server)
+```
+
+```{r}
+# Save dashboard as PDF file
+ggsave("dashboard.pdf", dashboard_layout, width = 60, height = 50, units = "in", limitsize = FALSE)
+
